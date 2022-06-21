@@ -88,7 +88,7 @@ proc app() =
       bottom == super
 
   mainDisplay.formattedText.horizontalAlignment = haRight
-  mainDisplay.font = systemFontOfSize(20)
+  mainDisplay.font = systemFontOfSize(25)
   subDisplay.formattedText.horizontalAlignment = haRight
   subDisplay.font = systemFontOfSize(15)
 
