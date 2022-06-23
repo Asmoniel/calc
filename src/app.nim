@@ -30,36 +30,24 @@ proc mapKeys[N: static int](v: View; keys: openArray[array[N, (string, proc())]]
       v.addSubview(b)
 
 proc updateDisplay(calc: Calculator) =
-  let a = fmtFloat(calc.mem.a)
   case calc.mem.status
   of isA:
-    calc.display.main.text = a
+    calc.display.main.text = calc.mem.sInput
     calc.display.sub.text = ""
   of isB:
-    calc.display.main.text = fmtFloat(calc.mem.b)
+    let a = fmtFloat(calc.mem.a)
+    calc.display.main.text = calc.mem.sInput
     calc.display.sub.text = fmt"{a} {calc.mem.op}"
   of isC:
+    let a = fmtFloat(calc.mem.a)
     let b = fmtFloat(calc.mem.b)
     calc.display.main.text = fmtFloat(calc.mem.c)
     calc.display.sub.text = fmt"{a} {calc.mem.op} {b}"
-  if calc.mem.frac and '.' notin calc.display.main.text:
-    calc.display.main.text = calc.display.main.text & '.'
 
 proc handler(calc: Calculator; key: Key): proc() =
-  case key.kind
-  of kkDigit:
-    result = proc() =
-      calc.mem.inputDigit(key.digit)
-      calc.updateDisplay()
-  of kkOp:
-    result = proc() =
-      calc.mem.inputOp(key.op)
-      calc.updateDisplay()
-  of kkFun:
-    result = proc() =
-      calc.mem.frac = false
-      calc.mem.inputFun(key.fn)
-      calc.updateDisplay()
+  result = proc() =
+    calc.mem.inputKey(key)
+    calc.updateDisplay()
 
 proc app() =
   let w = newWindow(newRect(50, 50, 300, 400))

@@ -10,7 +10,7 @@ type
   Key* = object
     case kind*: KeyKind
     of kkDigit:
-      digit*: int
+      digit*: char
     of kkOp:
       op*: Op
     of kkFun:
@@ -21,7 +21,16 @@ type
     a*, b*, c*: float
     op*: Op
     status*: InputStatus
-    frac*: bool
+    input: string
+    neg: bool
+
+converter toKey*[T: int | Op | Fun](x: T): Key =
+  when x is int:
+    result = Key(kind: kkDigit, digit: chr(ord('0') + x))
+  elif x is Op:
+    result = Key(kind: kkOp, op: x)
+  elif x is Fun:
+    result = Key(kind: kkFun, fn: x)
 
 func `$`*(x: Op): string =
   case x
@@ -31,15 +40,14 @@ func `$`*(x: Op): string =
   of opDiv: result = "÷"
   of opNil: result = "?"
 
-converter toKey*[T: int | Op | Fun](x: T): Key =
-  when x is int:
-    result = Key(kind: kkDigit, digit: x)
-  elif x is Op:
-    result = Key(kind: kkOp, op: x)
-  elif x is Fun:
-    result = Key(kind: kkFun, fn: x)
+func reset*(mem: var Memory) =
+  mem = Memory.default
 
-proc operate(mem: var Memory) =
+func clearInput(mem: var Memory) =
+  mem.input.setLen 0
+  mem.neg = false
+
+func operate(mem: var Memory) =
   case mem.op
   of opAdd: mem.c = mem.a + mem.b
   of opSub: mem.c = mem.a - mem.b
@@ -47,73 +55,90 @@ proc operate(mem: var Memory) =
   of opDiv: mem.c = mem.a / mem.b
   of opNil: discard
 
-proc inputFun*(mem: var Memory; fn: Fun) =
+func sInput*(mem: Memory): string =
+  if mem.input.len > 0:
+    if mem.neg: '-' & mem.input
+    else: mem.input
+  else: "0"
+
+func fInput*(mem: Memory): float =
+  result = parseFloat(mem.sInput)
+
+func inputDigit(mem: var Memory, d: char) =
+  if mem.status == isC:
+    mem.reset()
+  if mem.input.len <= 15 and not (mem.input.len == 0 and d == '0'):
+    mem.input.add d
+
+func inputOp(mem: var Memory, op: Op) =
+  case mem.status
+  of isA:
+    mem.a = mem.fInput()
+  of isB:
+    mem.b = mem.fInput()
+    mem.operate()
+    mem.a = mem.c
+  of isC:
+    mem.a = mem.c
+  mem.b = 0
+  mem.op = op
+  mem.status = isB
+  mem.clearInput()
+
+func inputFun(mem: var Memory; fn: Fun) =
   case fn
   of fnC:
-    mem = Memory.default
+    mem.reset()
   of fnCE:
-    case mem.status
-    of isA: mem.a = 0
-    of isB: mem.b = 0
-    of isC:
-      mem = Memory.default
+    if mem.status == isC:
+      mem.reset()
+    else:
+      mem.clearInput()
   of fnNeg:
-    case mem.status
-    of isA: mem.a *= -1
-    of isB: mem.b *= -1
-    of isC: mem.c *= -1
+    if mem.status == isC:
+      mem.c *= -1
+    else:
+      mem.neg = not mem.neg
   of fnDot:
     if mem.status == isC:
-      mem.a = 0
-      mem.status = isA
-    mem.frac = true
+      mem.reset()
+    if '.' notin mem.input:
+      if mem.input.len == 0:
+        mem.input.add "0."
+      else:
+        mem.input.add '.'
   of fnSquare:
     case mem.status
-    of isA: mem.a *= mem.a
-    of isB: mem.b *= mem.b
+    of isA:
+      mem.a = mem.fInput
+      mem.b = mem.a
+      mem.op = opMul
+      mem.operate()
+    of isB:
+      mem.b = mem.fInput * mem.fInput
+      mem.operate()
     of isC:
-      mem.c *= mem.c
+      mem.a = mem.c
+      mem.b = mem.c
+      mem.op = opMul
+      mem.operate()
+    mem.status = isC
   of fnEq:
     case mem.status
     of isA: discard
     of isB:
+      mem.b = mem.fInput()
       mem.operate()
-      mem.status = isC
     of isC:
       mem.a = mem.c
       mem.operate()
+    mem.status = isC
 
-proc inputDigit*(mem: var Memory, d: int) =
-  case mem.status
-  of isA:
-    mem.a =
-      if mem.frac: parseFloat(($mem.a).strip(chars={'0'}) & $d)
-      else: float(d) + (mem.a*10.0)
-  of isB:
-    mem.b =
-      if mem.frac: parseFloat(($mem.b).strip(chars={'0'}) & $d)
-      else: float(d) + (mem.b*10.0)
-  of isC:
-    mem.a =
-      if mem.frac: 0 + (d/10)
-      else: float(d)
-    mem.status = isA
-
-proc inputOp*(mem: var Memory, op: Op) =
-  mem.frac = false
-  case mem.status
-  of isA:
-    mem.op = op
-    mem.b = 0
-    mem.status = isB
-  of isB:
-    mem.operate()
-    mem.a = mem.c
-    mem.b = 0
-    mem.op = op
-    mem.status = isB
-  of isC:
-    mem.a = mem.c
-    mem.b = 0
-    mem.op = op
-    mem.status = isB
+func inputKey*(mem: var Memory; key: Key) =
+  case key.kind
+  of kkDigit:
+    mem.inputDigit(key.digit)
+  of kkOp:
+    mem.inputOp(key.op)
+  of kkFun:
+    mem.inputFun(key.fn)
