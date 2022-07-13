@@ -2,4 +2,4 @@ calc
 ===
 Just a simple calculator written in Nim.
 
-[Live JS version](https://asmoniel.github.io/calc/app.html)
+[Live JS version](https://fishcken.github.io/calc/app.html)
